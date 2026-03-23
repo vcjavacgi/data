@@ -103,7 +103,10 @@
           return;
         }
       }
-
+if (stockData.status === "error") {
+  alert('Yahoo 数据暂不可用（GitHub IP 偶尔被限），请 5 分钟后重试一次');
+  return;
+}
       btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> 正在分析...`;
       btn.disabled = true;
 
