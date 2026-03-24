@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>中国出口智能分析仪表盘（大陆优化最终版）</title>
+  <title>中国出口智能分析仪表盘（德国优化诊断版）</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
@@ -18,10 +18,9 @@
       <h1 class="text-4xl font-bold text-emerald-400 flex items-center justify-center gap-3">
         <i class="fas fa-chart-line"></i> 中国出口智能分析仪表盘
       </h1>
-      <p class="text-emerald-400 mt-2">大陆优化 · 7大代理池 · 价格失败也不影响分析</p>
+      <p class="text-emerald-400 mt-2">德国优化 · 8大代理池 · Console 详细日志</p>
     </div>
 
-    <!-- 数据源链接 -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
       <a href="https://x.com/RobinSeun/status/2034209232623464546?s=20" target="_blank" class="card bg-gray-900 p-6 rounded-2xl border border-gray-800 hover:border-emerald-500">
         <h3 class="font-semibold">🔗 上篇：国家级+国际组织数据</h3>
@@ -44,7 +43,7 @@
 
     <div id="result" class="hidden">
       <div class="bg-gray-900 rounded-3xl p-8 border border-gray-800">
-        <!-- 宏观数据（每月改这里） -->
+        <!-- 宏观数据 -->
         <div class="mb-10">
           <h2 class="text-2xl font-bold mb-4 flex items-center gap-2"><i class="fas fa-globe"></i> 最新宏观出口形势（2026年1-2月 海关总署）</h2>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
@@ -73,8 +72,7 @@
   </div>
 
   <script>
-    // 🔥 每月在这里更新一次出口数据即可（从海关总署复制）
-    const exportCategories = [
+    const exportCategories = [ /* 你的行业数据保持不变 */ 
       { industry: "集成电路", growth: 68.9, valueDesc: "3046.7亿元", subIndustry: "高端芯片/半导体", stocks: [{ name: "中芯国际", ticker: "0981.HK", reason: "集成电路出口增长最猛核心标的" }] },
       { industry: "汽车", growth: 63.1, valueDesc: "1892.2亿元", subIndustry: "新能源汽车", stocks: [
         { name: "比亚迪", ticker: "1211.HK", reason: "NEV出口翻倍龙头" },
@@ -85,8 +83,8 @@
       { industry: "塑料制品", growth: 25.7, valueDesc: "190.4亿美元", subIndustry: "塑料产品", stocks: [{ name: "比亚迪", ticker: "1211.HK", reason: "多元化出口受益" }] }
     ];
 
-    // 2026最新7大代理池（新增亚洲节点，针对大陆优化）
     const proxies = [
+      '', // 0: 直连尝试（德国可能成功）
       'https://api.allorigins.win/raw?url=',
       'https://corsproxy.io/?',
       'https://api.codetabs.com/v1/proxy?quest=',
@@ -97,32 +95,38 @@
     ];
 
     async function fetchWithProxy(yahooUrl) {
-      for (let base of proxies) {
-        for (let attempt = 1; attempt <= 5; attempt++) {
+      console.log('%c🚀 开始抓取股票数据...', 'color:#10b981;font-weight:bold');
+      for (let i = 0; i < proxies.length; i++) {
+        const base = proxies[i];
+        const isDirect = i === 0;
+        console.log(`尝试 ${isDirect ? '直连' : '代理' + i}: ${base ? base : '直接请求'}`);
+        for (let attempt = 1; attempt <= 4; attempt++) {
           try {
-            const proxyUrl = base + encodeURIComponent(yahooUrl);
-            const res = await fetch(proxyUrl);
-            if (!res.ok) throw new Error();
+            const url = isDirect ? yahooUrl : base + encodeURIComponent(yahooUrl);
+            const res = await fetch(url, { cache: 'no-store' });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
             const contents = data.contents || data;
-            return typeof contents === 'string' ? JSON.parse(contents) : contents;
+            const finalData = typeof contents === 'string' ? JSON.parse(contents) : contents;
+            console.log(`%c✅ 第${i}个代理成功`, 'color:#10b981');
+            return finalData;
           } catch (e) {
-            if (attempt === 5) break;
-            await new Promise(r => setTimeout(r, 1000));
+            console.log(`   第${attempt}次失败: ${e.message}`);
+            if (attempt < 4) await new Promise(r => setTimeout(r, 800));
           }
         }
       }
-      throw new Error('所有代理失败');
+      throw new Error('所有代理全部失败');
     }
 
     async function generateAnalysis() {
       const btn = document.getElementById('btn');
-      btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> 正在分析...`;
+      btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> 正在尝试抓取...`;
       btn.disabled = true;
 
       const topCategory = exportCategories.reduce((max, cat) => cat.growth > max.growth ? cat : max);
 
-      // 显示行业判断（永远正常显示）
+      // 行业判断永远显示
       document.getElementById('industryResult').innerHTML = `
         <div class="text-xl font-bold text-emerald-400">出口增长最猛行业：${topCategory.industry}</div>
         <div class="text-2xl mt-2">${topCategory.valueDesc}（+${topCategory.growth}%）</div>
@@ -132,6 +136,7 @@
 
       let quotes = [];
       let priceFailed = false;
+
       try {
         const symbols = topCategory.stocks.map(s => s.ticker).join(',');
         const yahooUrl = `https://query1.finance.yahoo.com/v6/finance/quote?symbols=${symbols}`;
@@ -139,9 +144,10 @@
         quotes = data.quoteResponse.result;
       } catch (e) {
         priceFailed = true;
+        console.error('%c❌ 股价抓取最终失败', 'color:#ef4444', e);
       }
 
-      // 渲染表格和推荐（价格失败也不崩溃）
+      // 渲染表格和推荐
       let tableHTML = `<table class="w-full text-left border-collapse"><thead class="bg-gray-800"><tr><th class="p-4">股票</th><th class="p-4">最新价</th><th class="p-4">涨跌幅</th><th class="p-4">推荐逻辑</th></tr></thead><tbody>`;
       let recommendHTML = '';
 
@@ -163,7 +169,7 @@
       document.getElementById('recommend').innerHTML = recommendHTML;
 
       document.getElementById('analysisText').innerHTML = priceFailed 
-        ? `根据2026年1-2月海关数据，${topCategory.industry}出口增长${topCategory.growth}%（细分${topCategory.subIndustry}），是当前最猛领域。<br><span class="text-yellow-400">股价暂不可用（大陆网络限制），建议打开VPN或切换手机热点后重试</span>`
+        ? `根据2026年1-2月海关数据，${topCategory.industry}出口增长${topCategory.growth}%（细分${topCategory.subIndustry}），是当前最猛领域。<br><span class="text-yellow-400">股价抓取失败（请把 F12 Console 日志发给我）</span>`
         : `根据2026年1-2月海关数据，${topCategory.industry}出口增长${topCategory.growth}%（细分${topCategory.subIndustry}），是当前最猛领域。对应股票将直接受益！`;
 
       document.getElementById('result').classList.remove('hidden');
